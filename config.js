@@ -18,7 +18,7 @@ window.CONFIG = {
   SUBTITULO: 'Atletismo — World Police & Fire Games',
 
   // Prazo mostrado para os atletas (texto livre)
-  PRAZO: '31 de outubro de 2026',
+  PRAZO: '01 de setembro de 2026',
 
   // WhatsApp do organizador (só dígitos, com DDD) para o botão "dúvidas"
   WHATSAPP_ORGANIZADOR: '',
