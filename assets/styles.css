@@ -82,7 +82,7 @@ header.topo p { margin: 0; color: var(--suave); font-size: .95rem; }
 label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
 .dica { font-weight: 400; color: var(--suave); font-size: .82rem; }
 
-input[type=text], input[type=tel], input[type=date], select, textarea {
+input[type=text], input[type=tel], input[type=date], input[type=password], select, textarea {
   width: 100%;
   padding: 12px 14px;
   font: inherit;
@@ -269,3 +269,12 @@ tr.faixa-linha td {
 a { color: var(--azul); }
 .vazio { color: var(--suave); text-align: center; padding: 28px; }
 .rodape { text-align: center; color: var(--suave); font-size: .8rem; padding: 20px 0; }
+
+.link-admin {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--suave);
+  text-decoration: none;
+  font-size: .8rem;
+}
+.link-admin:hover { color: var(--azul); text-decoration: underline; }

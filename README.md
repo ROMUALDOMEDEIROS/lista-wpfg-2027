@@ -15,9 +15,10 @@ Atleta C (WhatsApp) ┘        (link público)                        + Google S
 | Arquivo | Para que serve |
 |---|---|
 | `index.html` | Formulário do atleta — **este é o link que vai no grupo** |
-| `admin.html` | Painel do organizador (tabelas, exportação, remoção) — **uso só seu** |
+| `admin.html` | Painel do organizador — protegido por senha, alcançável pelo rodapé do formulário |
 | `config.js` | Onde você cola as credenciais do Supabase e ajusta título/prazo |
 | `supabase.sql` | Script que cria a tabela e as regras de segurança |
+| `supabase-admin.sql` | Script que guarda a **senha do organizador** dentro do banco |
 | `assets/` | Estilos e código compartilhado |
 
 Não precisa instalar nada: são arquivos estáticos, sem Node, sem build.
@@ -27,7 +28,8 @@ Não precisa instalar nada: são arquivos estáticos, sem Node, sem build.
 ## Testar agora (sem configurar nada)
 
 Dê dois cliques em `index.html`. Ele abre em **modo de teste**: as inscrições
-ficam salvas só no seu navegador. Abra `admin.html` para ver a lista.
+ficam salvas só no seu navegador. Abra `admin.html` (senha de teste: `teste`)
+para ver a lista.
 Serve para você conferir o formulário antes de publicar.
 
 ---
@@ -41,10 +43,10 @@ Serve para você conferir o formulário antes de publicar.
    → defina uma senha de banco e guarde. Aguarde ~2 minutos.
 3. Menu **SQL Editor** → **New query** → cole todo o conteúdo de `supabase.sql`
    → **Run**. Deve aparecer *Success*.
-4. Menu **Project Settings → API**. Copie:
+4. Repita com o `supabase-admin.sql` (é ele que guarda a senha do organizador).
+5. Menu **Project Settings → API**. Copie:
    - **Project URL** (ex.: `https://abcdefgh.supabase.co`)
-   - chave **anon public**
-   - chave **service_role** (a secreta — guarde num lugar seguro, é só sua)
+   - chave **anon public** (é a única que o site usa)
 
 ### 2. Preencher o `config.js` — 2 min
 
@@ -57,32 +59,36 @@ PRAZO: '31 de outubro de 2026',
 WHATSAPP_ORGANIZADOR: '61987654321'
 ```
 
-### 3. Publicar o site — 10 min
+### 3. Publicar o site — 5 min
 
-**Opção mais fácil — Netlify Drop (sem cadastro complicado, sem Git):**
+Este projeto está publicado no **GitHub Pages**, no repositório
+<https://github.com/ROMUALDOMEDEIROS/lista-wpfg-2027>:
 
-1. Acesse <https://app.netlify.com/drop>
-2. Arraste a **pasta inteira** do projeto para a página.
-3. Em segundos você recebe um endereço, ex.: `https://algo-aleatorio.netlify.app`.
-4. Crie uma conta grátis para manter o site e, se quiser, renomeie o endereço
-   em *Site settings → Change site name* (ex.: `wpfg2027-atletismo`).
+- Formulário: <https://romualdomedeiros.github.io/lista-wpfg-2027/>
+- Painel: <https://romualdomedeiros.github.io/lista-wpfg-2027/admin.html>
 
-**Alternativa — Vercel:** <https://vercel.com> → *Add New → Project → Deploy*
-(pode subir a pasta pelo GitHub ou pelo CLI `npx vercel`). O resultado é o mesmo.
+Para publicar uma alteração, na pasta do projeto:
+
+```
+git add -A && git commit -m "descricao da mudanca" && git push
+```
+
+Em cerca de 1 minuto o site no ar já está atualizado.
 
 ### 4. Divulgar no grupo — 1 min
 
-Abra o `admin.html` publicado, clique em **Mensagem do WhatsApp** e cole no grupo.
+Abra o painel, clique em **Mensagem do WhatsApp** e cole no grupo.
 O texto já vai com o link do formulário e as instruções.
 
-> O link do atleta termina em `index.html`. **Não mande o `admin.html` no grupo.**
+> Mande o endereço puro do site. O painel mora no mesmo link, no rodapé
+> (*🔒 Área do organizador*), atrás da senha — os atletas veem o cadeado, não a lista.
 
 ---
 
 ## Como você recebe os dados
 
-Abra `admin.html`, cole a chave **service_role** (fica guardada só no seu
-navegador, é pedida uma vez) e você vê:
+Abra o painel pelo rodapé do formulário (*🔒 Área do organizador*), digite a
+senha e você vê:
 
 - **Métricas** — total, quantos homens, quantas mulheres, categorias preenchidas.
 - **Duas tabelas** — Masculino e Feminino, cada uma agrupada por faixa etária,
@@ -132,5 +138,6 @@ lista. Ninguém que receber o link consegue baixar os telefones dos colegas.
 | Lista de provas / categorias / data de corte da idade | `assets/dados.js` |
 | Cores e visual | `assets/styles.css` |
 | Campos novos (clube, unidade, tamanho de uniforme) | `index.html` + `supabase.sql` |
+| Senha do organizador | `supabase-admin.sql` (troque nas duas funções e rode de novo) |
 
-Depois de qualquer alteração, publique de novo (arraste a pasta no Netlify Drop).
+Depois de qualquer alteração, rode `git add -A && git commit -m "..." && git push`.

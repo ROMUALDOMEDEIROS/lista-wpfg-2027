@@ -21,5 +21,9 @@ window.CONFIG = {
   PRAZO: '31 de outubro de 2026',
 
   // WhatsApp do organizador (só dígitos, com DDD) para o botão "dúvidas"
-  WHATSAPP_ORGANIZADOR: ''
+  WHATSAPP_ORGANIZADOR: '',
+
+  // Senha usada APENAS no modo de teste (sem Supabase configurado).
+  // A senha de verdade fica dentro do banco, no arquivo supabase-admin.sql.
+  SENHA_TESTE_LOCAL: 'teste'
 };

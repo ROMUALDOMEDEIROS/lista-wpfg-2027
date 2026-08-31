@@ -1,5 +1,9 @@
 /* Camada de dados: fala com o Supabase via REST.
-   Sem credenciais configuradas, cai em MODO LOCAL (localStorage). */
+   Sem credenciais configuradas, cai em MODO LOCAL (localStorage).
+
+   O atleta grava direto na tabela (política de INSERT).
+   O organizador lê e remove por funções protegidas por senha no banco
+   (listar_atletas / remover_atleta) — a senha nunca fica no código do site. */
 
 const CHAVE_LOCAL = 'wpfg2027_atletas';
 
@@ -7,10 +11,10 @@ function supabaseConfigurado() {
   return Boolean(window.CONFIG && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 }
 
-function headers(chave, extras) {
+function headers(extras) {
   return Object.assign({
-    apikey: chave,
-    Authorization: 'Bearer ' + chave,
+    apikey: CONFIG.SUPABASE_ANON_KEY,
+    Authorization: 'Bearer ' + CONFIG.SUPABASE_ANON_KEY,
     'Content-Type': 'application/json'
   }, extras || {});
 }
@@ -29,14 +33,39 @@ function gravarLocal(lista) {
   localStorage.setItem(CHAVE_LOCAL, JSON.stringify(lista));
 }
 
-/* ---------- API publica ---------- */
+/* Erro de senha errada, para o painel tratar de forma amigável. */
+function erroSenha() {
+  const err = new Error('Senha incorreta.');
+  err.senhaInvalida = true;
+  return err;
+}
 
-/* Inscreve um atleta. Lanca Error com .duplicado = true se o telefone ja existe. */
+async function chamarFuncao(nome, corpo) {
+  const res = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/rpc/' + nome, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(corpo)
+  });
+
+  if (res.ok) {
+    const texto = await res.text();
+    return texto ? JSON.parse(texto) : null;
+  }
+
+  let dados = {};
+  try { dados = await res.json(); } catch (e) { /* resposta sem json */ }
+  if ((dados.message || '').indexOf('Senha incorreta') !== -1) throw erroSenha();
+  throw new Error(dados.message || dados.hint || ('Erro ' + res.status + '.'));
+}
+
+/* ---------- API pública ---------- */
+
+/* Inscreve um atleta. Lança Error com .duplicado = true se o telefone já existe. */
 async function inscrever(atleta) {
   if (!supabaseConfigurado()) {
     const lista = lerLocal();
     if (lista.some(function (a) { return a.telefone === atleta.telefone; })) {
-      const err = new Error('Este telefone ja esta inscrito.');
+      const err = new Error('Este telefone já está inscrito.');
       err.duplicado = true;
       throw err;
     }
@@ -49,7 +78,7 @@ async function inscrever(atleta) {
 
   const res = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/atletas', {
     method: 'POST',
-    headers: headers(CONFIG.SUPABASE_ANON_KEY, { Prefer: 'return=minimal' }),
+    headers: headers({ Prefer: 'return=minimal' }),
     body: JSON.stringify(atleta)
   });
 
@@ -58,53 +87,29 @@ async function inscrever(atleta) {
   let corpo = {};
   try { corpo = await res.json(); } catch (e) { /* resposta sem json */ }
   if (res.status === 409 || corpo.code === '23505') {
-    const err = new Error('Este telefone ja esta inscrito.');
+    const err = new Error('Este telefone já está inscrito.');
     err.duplicado = true;
     throw err;
   }
   throw new Error(corpo.message || corpo.hint || ('Erro ' + res.status + ' ao salvar.'));
 }
 
-/* Painel do organizador: usa a chave service_role, digitada na hora e
-   guardada apenas neste navegador. */
-async function listarAtletas(chaveAdmin) {
+/* Painel do organizador: a senha é conferida dentro do banco de dados. */
+async function listarAtletas(senha) {
   if (!supabaseConfigurado()) {
+    if (senha !== CONFIG.SENHA_TESTE_LOCAL) throw erroSenha();
     return lerLocal().sort(function (a, b) {
       return (a.criado_em || '').localeCompare(b.criado_em || '');
     });
   }
-  const url = CONFIG.SUPABASE_URL + '/rest/v1/atletas?select=*&order=criado_em.asc';
-  const res = await fetch(url, { headers: headers(chaveAdmin) });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error('Nao consegui ler os dados (' + res.status + '). ' + t.slice(0, 200));
-  }
-  return res.json();
+  return chamarFuncao('listar_atletas', { senha: senha });
 }
 
-async function removerAtleta(chaveAdmin, id) {
+async function removerAtleta(senha, id) {
   if (!supabaseConfigurado()) {
+    if (senha !== CONFIG.SENHA_TESTE_LOCAL) throw erroSenha();
     gravarLocal(lerLocal().filter(function (a) { return String(a.id) !== String(id); }));
     return;
   }
-  const url = CONFIG.SUPABASE_URL + '/rest/v1/atletas?id=eq.' + encodeURIComponent(id);
-  const res = await fetch(url, { method: 'DELETE', headers: headers(chaveAdmin) });
-  if (!res.ok) throw new Error('Nao consegui remover (' + res.status + ').');
-}
-
-async function atualizarAtleta(chaveAdmin, id, campos) {
-  if (!supabaseConfigurado()) {
-    const lista = lerLocal().map(function (a) {
-      return String(a.id) === String(id) ? Object.assign({}, a, campos) : a;
-    });
-    gravarLocal(lista);
-    return;
-  }
-  const url = CONFIG.SUPABASE_URL + '/rest/v1/atletas?id=eq.' + encodeURIComponent(id);
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: headers(chaveAdmin, { Prefer: 'return=minimal' }),
-    body: JSON.stringify(campos)
-  });
-  if (!res.ok) throw new Error('Nao consegui salvar a alteracao (' + res.status + ').');
+  return chamarFuncao('remover_atleta', { senha: senha, atleta_id: Number(id) });
 }

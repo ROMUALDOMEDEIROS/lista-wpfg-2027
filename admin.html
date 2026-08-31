@@ -17,16 +17,21 @@
   </header>
 
   <div id="telaChave" class="card" hidden>
-    <h2 style="margin-top:0;font-size:1.05rem">Acesso ao banco de dados</h2>
+    <h2 style="margin-top:0;font-size:1.05rem">🔒 Área restrita</h2>
     <p class="dica" style="margin-top:0">
-      Cole a chave <strong>service_role</strong> do Supabase (Project Settings → API).
-      Ela fica guardada só neste navegador e nunca é enviada para outro lugar.
-      Não compartilhe esta página nem esta chave com os atletas.
+      Esta página é da organização. Digite a senha para ver a lista de inscritos.
     </p>
-    <div class="campo">
-      <input type="text" id="chave" placeholder="eyJhbGciOi..." autocomplete="off">
-    </div>
-    <button class="btn-principal" id="btnEntrar">Abrir painel</button>
+    <form id="formSenha">
+      <div class="campo">
+        <label for="chave">Senha do organizador</label>
+        <input type="password" id="chave" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="erroSenha" class="aviso aviso-erro" hidden></div>
+      <button type="submit" class="btn-principal" id="btnEntrar">Entrar</button>
+    </form>
+    <p style="text-align:center;margin:16px 0 0">
+      <a href="index.html" class="dica">← Voltar para o formulário de inscrição</a>
+    </p>
   </div>
 
   <div id="painel" hidden>
@@ -58,7 +63,10 @@
     </div>
   </div>
 
-  <p class="rodape">Página de uso interno — não divulgue este endereço no grupo.</p>
+  <p class="rodape">
+    Área restrita da organização.<br>
+    <a href="index.html" class="link-admin">← Formulário de inscrição</a>
+  </p>
 </div>
 
 <script src="config.js"></script>
@@ -67,52 +75,77 @@
 <script>
 (function () {
   const $ = function (id) { return document.getElementById(id); };
-  const CHAVE_GUARDADA = 'wpfg2027_admin_key';
-  let chaveAdmin = '';
+  const CHAVE_GUARDADA = 'wpfg2027_admin_senha';
+  let senhaAdmin = '';
   let atletas = [];
 
   /* ---------- acesso ---------- */
-  function iniciar() {
-    if (!supabaseConfigurado()) {
-      $('avisoLocal').hidden = false;
-      abrirPainel();
-      return;
+  async function iniciar() {
+    if (!supabaseConfigurado()) $('avisoLocal').hidden = false;
+
+    const salva = sessionStorage.getItem(CHAVE_GUARDADA) || localStorage.getItem(CHAVE_GUARDADA);
+    if (salva) {
+      senhaAdmin = salva;
+      const ok = await carregar(true);
+      if (ok) { $('painel').hidden = false; return; }
+      localStorage.removeItem(CHAVE_GUARDADA);
+      sessionStorage.removeItem(CHAVE_GUARDADA);
     }
-    const salva = localStorage.getItem(CHAVE_GUARDADA);
-    if (salva) { chaveAdmin = salva; abrirPainel(); }
-    else { $('telaChave').hidden = false; }
+    $('telaChave').hidden = false;
+    $('chave').focus();
   }
 
-  $('btnEntrar').addEventListener('click', function () {
+  $('formSenha').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
     const v = $('chave').value.trim();
-    if (v.length < 20) { alert('Cole a chave service_role completa.'); return; }
-    chaveAdmin = v;
+    const alvo = $('erroSenha');
+    const btn = $('btnEntrar');
+    if (!v) { alvo.textContent = 'Digite a senha.'; alvo.hidden = false; return; }
+
+    alvo.hidden = true;
+    btn.disabled = true;
+    btn.textContent = 'Verificando…';
+    senhaAdmin = v;
+    const ok = await carregar(true);
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+
+    if (!ok) {
+      senhaAdmin = '';
+      alvo.textContent = ultimoErro || 'Senha incorreta.';
+      alvo.hidden = false;
+      $('chave').select();
+      return;
+    }
     localStorage.setItem(CHAVE_GUARDADA, v);
+    $('chave').value = '';
     $('telaChave').hidden = true;
-    abrirPainel();
+    $('painel').hidden = false;
   });
 
   $('btnSair').addEventListener('click', function () {
     localStorage.removeItem(CHAVE_GUARDADA);
+    sessionStorage.removeItem(CHAVE_GUARDADA);
     location.reload();
   });
 
-  function abrirPainel() {
-    $('painel').hidden = false;
-    carregar();
-  }
-
   /* ---------- carregar ---------- */
-  async function carregar() {
+  let ultimoErro = '';
+
+  async function carregar(silencioso) {
     erro('');
+    ultimoErro = '';
     try {
-      atletas = await listarAtletas(chaveAdmin);
+      atletas = await listarAtletas(senhaAdmin);
       render();
+      return true;
     } catch (e) {
-      erro(e.message + ' — confira a chave service_role e a URL em config.js.');
+      ultimoErro = e.senhaInvalida ? 'Senha incorreta.' : e.message;
+      if (!silencioso) erro(ultimoErro);
+      return false;
     }
   }
-  $('btnAtualizar').addEventListener('click', carregar);
+  $('btnAtualizar').addEventListener('click', function () { carregar(false); });
   $('busca').addEventListener('input', render);
 
   function erro(msg) {
@@ -259,7 +292,7 @@
         btn.addEventListener('click', async function () {
           if (!confirm('Remover a inscrição de ' + a.nome + '?')) return;
           try {
-            await removerAtleta(chaveAdmin, a.id);
+            await removerAtleta(senhaAdmin, a.id);
             atletas = atletas.filter(function (x) { return x.id !== a.id; });
             render();
             aviso('Inscrição de ' + a.nome + ' removida.');
