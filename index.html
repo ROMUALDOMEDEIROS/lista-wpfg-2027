@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lista de Intenção WPFG 2027 - Atletismo</title>
+<meta name="description" content="Formulário de intenção de participação no atletismo dos World Police &amp; Fire Games 2027.">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="container">
+
+  <header class="topo">
+    <span class="faixa">Atletismo</span>
+    <h1 id="titulo">Lista de Intenção WPFG 2027</h1>
+    <p id="subtitulo">World Police &amp; Fire Games</p>
+  </header>
+
+  <div id="avisoLocal" class="aviso aviso-atencao" hidden>
+    <strong>Modo de teste.</strong> O banco de dados ainda não foi configurado —
+    as inscrições ficam salvas apenas neste navegador. Veja o
+    <code>README.md</code> para publicar de verdade.
+  </div>
+
+  <div id="telaFormulario">
+    <div class="card">
+      <p style="margin-top:0;color:var(--suave);font-size:.93rem">
+        Preencha seus dados e escolha <strong>exatamente 3 provas</strong>.
+        Prazo: <strong id="prazo">—</strong>.
+      </p>
+
+      <form id="form" novalidate>
+
+        <div class="campo">
+          <label for="nome">Nome de guerra <span class="dica">— como você é chamado</span></label>
+          <input type="text" id="nome" name="nome" autocomplete="name" placeholder="Ex.: Romualdo" maxlength="40" required>
+        </div>
+
+        <div class="campo">
+          <label for="telefone">Telefone / WhatsApp <span class="dica">— com DDD</span></label>
+          <input type="tel" id="telefone" name="telefone" inputmode="numeric" placeholder="(61) 98765-4321" required>
+        </div>
+
+        <div class="campo">
+          <label>Gênero</label>
+          <div class="genero">
+            <label><input type="radio" name="genero" value="Masculino" required><span>Masculino</span></label>
+            <label><input type="radio" name="genero" value="Feminino"><span>Feminino</span></label>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="nascimento">Data de nascimento</label>
+          <input type="date" id="nascimento" name="nascimento" required>
+          <div id="categoriaAuto" class="categoria-auto" hidden></div>
+        </div>
+
+        <div class="campo">
+          <label for="categoria">Categoria (faixa etária)</label>
+          <select id="categoria" name="categoria" required>
+            <option value="">Selecione…</option>
+          </select>
+          <p class="dica" style="margin:6px 0 0">
+            Preenchida automaticamente pela data de nascimento. Só altere se a organização orientar.
+          </p>
+        </div>
+
+        <div class="campo">
+          <label style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            Escolha suas 3 provas
+            <span id="contador" class="contador">0 de 3</span>
+          </label>
+          <div id="listaProvas"></div>
+        </div>
+
+        <div class="campo">
+          <label for="observacoes">Observações <span class="dica">— opcional</span></label>
+          <textarea id="observacoes" name="observacoes" rows="2" maxlength="200"
+            placeholder="Ex.: unidade, equipe, revezamento, alguma restrição"></textarea>
+        </div>
+
+        <div id="erro" class="aviso aviso-erro" hidden></div>
+
+        <button type="submit" id="enviar" class="btn-principal">Confirmar minha inscrição</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="telaSucesso" class="card sucesso" hidden>
+    <div class="marca">✅</div>
+    <h2>Inscrição registrada!</h2>
+    <p style="color:var(--suave);margin:0">Sua intenção de participação foi enviada para a organização.</p>
+    <dl class="resumo" id="resumo"></dl>
+    <div style="margin-top:22px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button type="button" class="btn-sec" id="btnOutro">Inscrever outro atleta</button>
+      <a id="btnDuvidas" class="btn-sec" style="text-decoration:none;display:none" target="_blank" rel="noopener">Falar com o organizador</a>
+    </div>
+  </div>
+
+  <p class="rodape">Lista de intenção — não substitui a inscrição oficial do evento.</p>
+</div>
+
+<script src="config.js"></script>
+<script src="assets/dados.js"></script>
+<script src="assets/api.js"></script>
+<script>
+(function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const selecionadas = new Set();
+
+  /* ---------- textos vindos do config ---------- */
+  if (CONFIG.EVENTO) { $('titulo').textContent = CONFIG.EVENTO; document.title = CONFIG.EVENTO; }
+  if (CONFIG.SUBTITULO) $('subtitulo').textContent = CONFIG.SUBTITULO;
+  $('prazo').textContent = CONFIG.PRAZO || 'a definir';
+  if (!supabaseConfigurado()) $('avisoLocal').hidden = false;
+  if (CONFIG.WHATSAPP_ORGANIZADOR) {
+    const a = $('btnDuvidas');
+    a.href = linkWhatsApp(CONFIG.WHATSAPP_ORGANIZADOR, 'Olá! Falo sobre a lista do WPFG 2027.');
+    a.style.display = 'inline-block';
+  }
+
+  /* ---------- categorias ---------- */
+  const selCategoria = $('categoria');
+  CATEGORIAS.forEach(function (c) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    selCategoria.appendChild(o);
+  });
+
+  /* ---------- provas ---------- */
+  const lista = $('listaProvas');
+  GRUPOS_PROVAS.forEach(function (grupo) {
+    const bloco = document.createElement('div');
+    bloco.className = 'grupo-provas';
+    const h = document.createElement('h3');
+    h.textContent = grupo.nome;
+    bloco.appendChild(h);
+
+    const grade = document.createElement('div');
+    grade.className = 'provas';
+    grupo.provas.forEach(function (prova) {
+      const lab = document.createElement('label');
+      lab.className = 'prova';
+      const inp = document.createElement('input');
+      inp.type = 'checkbox';
+      inp.value = prova;
+      lab.appendChild(inp);
+      lab.appendChild(document.createTextNode(prova));
+      inp.addEventListener('change', function () {
+        if (inp.checked) {
+          if (selecionadas.size >= 3) { inp.checked = false; return; }
+          selecionadas.add(prova);
+        } else {
+          selecionadas.delete(prova);
+        }
+        atualizarContador();
+      });
+      grade.appendChild(lab);
+    });
+    bloco.appendChild(grade);
+    lista.appendChild(bloco);
+  });
+
+  function atualizarContador() {
+    const c = $('contador');
+    c.textContent = selecionadas.size + ' de 3';
+    c.classList.toggle('completo', selecionadas.size === 3);
+    document.querySelectorAll('.prova').forEach(function (lab) {
+      const inp = lab.querySelector('input');
+      const bloqueia = selecionadas.size >= 3 && !inp.checked;
+      lab.classList.toggle('bloqueada', bloqueia);
+      inp.disabled = bloqueia;
+    });
+  }
+  atualizarContador();
+
+  /* ---------- telefone com máscara ---------- */
+  const tel = $('telefone');
+  tel.addEventListener('input', function () { tel.value = formatarTelefone(tel.value); });
+
+  /* ---------- categoria automática ---------- */
+  const nasc = $('nascimento');
+  nasc.addEventListener('change', function () {
+    const box = $('categoriaAuto');
+    const idade = idadeNaReferencia(nasc.value);
+    const cat = categoriaPorIdade(idade);
+    if (cat) {
+      selCategoria.value = cat;
+      box.className = 'categoria-auto';
+      box.textContent = 'Em ' + DATA_REFERENCIA.slice(0, 4) + ' você terá ' + idade + ' anos → categoria ' + cat + '.';
+      box.hidden = false;
+    } else if (idade !== null) {
+      box.className = 'categoria-auto erro';
+      box.textContent = 'Idade calculada: ' + idade + ' anos. A categoria mínima é 18 anos — confira a data.';
+      box.hidden = false;
+    } else {
+      box.hidden = true;
+    }
+  });
+
+  /* ---------- envio ---------- */
+  function mostrarErro(msg) {
+    const e = $('erro');
+    e.textContent = msg;
+    e.hidden = false;
+    e.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  $('form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    $('erro').hidden = true;
+
+    const nome = $('nome').value.trim();
+    const generoEl = document.querySelector('input[name=genero]:checked');
+    const provas = Array.from(selecionadas);
+
+    if (nome.length < 2) return mostrarErro('Escreva seu nome de guerra.');
+    if (!telefoneValido(tel.value)) return mostrarErro('Telefone inválido. Use DDD + número, ex.: (61) 98765-4321.');
+    if (!generoEl) return mostrarErro('Escolha o gênero.');
+    if (!nasc.value) return mostrarErro('Informe a data de nascimento.');
+    if (!selCategoria.value) return mostrarErro('Selecione a categoria (faixa etária).');
+    if (provas.length !== 3) return mostrarErro('Escolha exatamente 3 provas — você marcou ' + provas.length + '.');
+
+    const atleta = {
+      nome: nome,
+      telefone: somenteDigitos(tel.value),
+      genero: generoEl.value,
+      nascimento: nasc.value,
+      categoria: selCategoria.value,
+      prova1: provas[0],
+      prova2: provas[1],
+      prova3: provas[2],
+      observacoes: $('observacoes').value.trim() || null
+    };
+
+    const btn = $('enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+    try {
+      await inscrever(atleta);
+      mostrarSucesso(atleta);
+    } catch (err) {
+      mostrarErro(err.duplicado
+        ? 'Este telefone já está inscrito. Se precisar corrigir algo, fale com o organizador.'
+        : ('Não consegui enviar: ' + err.message));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Confirmar minha inscrição';
+    }
+  });
+
+  function mostrarSucesso(a) {
+    const linhas = [
+      ['Nome de guerra', a.nome],
+      ['Telefone', formatarTelefone(a.telefone)],
+      ['Gênero', a.genero],
+      ['Categoria', a.categoria],
+      ['Prova 1', a.prova1],
+      ['Prova 2', a.prova2],
+      ['Prova 3', a.prova3]
+    ];
+    const dl = $('resumo');
+    dl.innerHTML = '';
+    linhas.forEach(function (l) {
+      const div = document.createElement('div');
+      const dt = document.createElement('dt');
+      dt.textContent = l[0];
+      const st = document.createElement('strong');
+      st.textContent = l[1];
+      div.appendChild(dt);
+      div.appendChild(st);
+      dl.appendChild(div);
+    });
+    $('telaFormulario').hidden = true;
+    $('telaSucesso').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  $('btnOutro').addEventListener('click', function () {
+    $('form').reset();
+    selecionadas.clear();
+    document.querySelectorAll('.prova input').forEach(function (i) { i.checked = false; });
+    atualizarContador();
+    $('categoriaAuto').hidden = true;
+    $('telaSucesso').hidden = true;
+    $('telaFormulario').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>
+</body>
+</html>

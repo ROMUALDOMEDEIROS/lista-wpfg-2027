@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel do organizador — WPFG 2027</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="container-largo">
+
+  <header class="topo">
+    <span class="faixa">Painel do organizador</span>
+    <h1>Lista de Intenção WPFG 2027</h1>
+    <p>Atletismo — inscrições agrupadas por gênero e categoria</p>
+  </header>
+
+  <div id="telaChave" class="card" hidden>
+    <h2 style="margin-top:0;font-size:1.05rem">Acesso ao banco de dados</h2>
+    <p class="dica" style="margin-top:0">
+      Cole a chave <strong>service_role</strong> do Supabase (Project Settings → API).
+      Ela fica guardada só neste navegador e nunca é enviada para outro lugar.
+      Não compartilhe esta página nem esta chave com os atletas.
+    </p>
+    <div class="campo">
+      <input type="text" id="chave" placeholder="eyJhbGciOi..." autocomplete="off">
+    </div>
+    <button class="btn-principal" id="btnEntrar">Abrir painel</button>
+  </div>
+
+  <div id="painel" hidden>
+    <div id="avisoLocal" class="aviso aviso-atencao" hidden>
+      <strong>Modo de teste.</strong> Mostrando as inscrições salvas neste navegador
+      (o Supabase ainda não foi configurado em <code>config.js</code>).
+    </div>
+
+    <div class="metricas" id="metricas"></div>
+
+    <div class="barra">
+      <input type="text" id="busca" placeholder="Buscar nome, telefone, prova…" style="max-width:280px">
+      <button class="btn-sec" id="btnAtualizar">Atualizar</button>
+      <span class="espaco"></span>
+      <button class="btn-sec btn-verde" id="btnTSV">Copiar para Google Sheets</button>
+      <button class="btn-sec" id="btnCSV">Baixar CSV</button>
+      <button class="btn-sec" id="btnMsg">Mensagem do WhatsApp</button>
+      <button class="btn-sec" id="btnSair">Sair</button>
+    </div>
+
+    <div id="statusAcao" class="aviso aviso-ok" hidden></div>
+    <div id="statusErro" class="aviso aviso-erro" hidden></div>
+
+    <div id="listas"></div>
+
+    <div class="card" id="cardProvas">
+      <h2 style="margin-top:0;font-size:1.05rem">Atletas por prova</h2>
+      <div class="tabela-wrap"><table id="tabelaProvas"></table></div>
+    </div>
+  </div>
+
+  <p class="rodape">Página de uso interno — não divulgue este endereço no grupo.</p>
+</div>
+
+<script src="config.js"></script>
+<script src="assets/dados.js"></script>
+<script src="assets/api.js"></script>
+<script>
+(function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const CHAVE_GUARDADA = 'wpfg2027_admin_key';
+  let chaveAdmin = '';
+  let atletas = [];
+
+  /* ---------- acesso ---------- */
+  function iniciar() {
+    if (!supabaseConfigurado()) {
+      $('avisoLocal').hidden = false;
+      abrirPainel();
+      return;
+    }
+    const salva = localStorage.getItem(CHAVE_GUARDADA);
+    if (salva) { chaveAdmin = salva; abrirPainel(); }
+    else { $('telaChave').hidden = false; }
+  }
+
+  $('btnEntrar').addEventListener('click', function () {
+    const v = $('chave').value.trim();
+    if (v.length < 20) { alert('Cole a chave service_role completa.'); return; }
+    chaveAdmin = v;
+    localStorage.setItem(CHAVE_GUARDADA, v);
+    $('telaChave').hidden = true;
+    abrirPainel();
+  });
+
+  $('btnSair').addEventListener('click', function () {
+    localStorage.removeItem(CHAVE_GUARDADA);
+    location.reload();
+  });
+
+  function abrirPainel() {
+    $('painel').hidden = false;
+    carregar();
+  }
+
+  /* ---------- carregar ---------- */
+  async function carregar() {
+    erro('');
+    try {
+      atletas = await listarAtletas(chaveAdmin);
+      render();
+    } catch (e) {
+      erro(e.message + ' — confira a chave service_role e a URL em config.js.');
+    }
+  }
+  $('btnAtualizar').addEventListener('click', carregar);
+  $('busca').addEventListener('input', render);
+
+  function erro(msg) {
+    const el = $('statusErro');
+    el.textContent = msg;
+    el.hidden = !msg;
+  }
+  function aviso(msg) {
+    const el = $('statusAcao');
+    el.textContent = msg;
+    el.hidden = false;
+    setTimeout(function () { el.hidden = true; }, 3500);
+  }
+
+  /* ---------- render ---------- */
+  function filtrados() {
+    const t = $('busca').value.trim().toLowerCase();
+    if (!t) return atletas;
+    return atletas.filter(function (a) {
+      return [a.nome, a.telefone, a.categoria, a.prova1, a.prova2, a.prova3, a.observacoes]
+        .join(' ').toLowerCase().indexOf(t) !== -1;
+    });
+  }
+
+  function render() {
+    const lista = filtrados();
+
+    /* métricas */
+    const masc = lista.filter(function (a) { return a.genero === 'Masculino'; });
+    const fem = lista.filter(function (a) { return a.genero === 'Feminino'; });
+    const cats = new Set(lista.map(function (a) { return a.categoria; }));
+    $('metricas').innerHTML = '';
+    [
+      ['Total de atletas', lista.length],
+      ['Masculino', masc.length],
+      ['Feminino', fem.length],
+      ['Categorias com inscritos', cats.size]
+    ].forEach(function (m) {
+      const d = document.createElement('div');
+      d.className = 'metrica';
+      const b = document.createElement('b'); b.textContent = m[1];
+      const s = document.createElement('span'); s.textContent = m[0];
+      d.appendChild(b); d.appendChild(s);
+      $('metricas').appendChild(d);
+    });
+
+    /* tabelas por gênero */
+    const listas = $('listas');
+    listas.innerHTML = '';
+    listas.appendChild(blocoGenero('Masculino', masc));
+    listas.appendChild(blocoGenero('Feminino', fem));
+
+    /* contagem por prova */
+    const cont = {};
+    PROVAS.forEach(function (p) { cont[p] = { M: 0, F: 0 }; });
+    lista.forEach(function (a) {
+      [a.prova1, a.prova2, a.prova3].forEach(function (p) {
+        if (!cont[p]) cont[p] = { M: 0, F: 0 };
+        cont[p][a.genero === 'Feminino' ? 'F' : 'M']++;
+      });
+    });
+    const tp = $('tabelaProvas');
+    tp.innerHTML = '<thead><tr><th>Prova</th><th>Masculino</th><th>Feminino</th><th>Total</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    Object.keys(cont).forEach(function (p) {
+      const c = cont[p];
+      const tr = document.createElement('tr');
+      [p, c.M, c.F, c.M + c.F].forEach(function (v, i) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        if (i === 0) td.style.fontWeight = '600';
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    tp.appendChild(tb);
+  }
+
+  function blocoGenero(genero, lista) {
+    const wrap = document.createElement('div');
+    wrap.className = 'card' + (genero === 'Feminino' ? ' bloco-fem' : '');
+
+    const h = document.createElement('h2');
+    h.className = 'genero-titulo ' + (genero === 'Feminino' ? 'fem' : 'masc');
+    h.textContent = (genero === 'Feminino' ? '♀ Feminino' : '♂ Masculino') +
+      ' — ' + lista.length + (lista.length === 1 ? ' atleta' : ' atletas');
+    wrap.appendChild(h);
+
+    if (!lista.length) {
+      const p = document.createElement('p');
+      p.className = 'vazio';
+      p.textContent = 'Nenhuma inscrição ainda.';
+      wrap.appendChild(p);
+      return wrap;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'tabela-wrap';
+    const tabela = document.createElement('table');
+    tabela.innerHTML = '<thead><tr><th>#</th><th>Nome de guerra</th><th>Telefone</th>' +
+      '<th>Prova 1</th><th>Prova 2</th><th>Prova 3</th><th>Obs.</th><th></th></tr></thead>';
+    const tb = document.createElement('tbody');
+
+    CATEGORIAS.forEach(function (cat) {
+      const doGrupo = lista.filter(function (a) { return a.categoria === cat; });
+      if (!doGrupo.length) return;
+
+      const trCat = document.createElement('tr');
+      trCat.className = 'faixa-linha';
+      const tdCat = document.createElement('td');
+      tdCat.colSpan = 8;
+      tdCat.textContent = cat + ' — ' + doGrupo.length + (doGrupo.length === 1 ? ' atleta' : ' atletas');
+      trCat.appendChild(tdCat);
+      tb.appendChild(trCat);
+
+      doGrupo.forEach(function (a, i) {
+        const tr = document.createElement('tr');
+
+        const tdN = document.createElement('td'); tdN.textContent = i + 1;
+        const tdNome = document.createElement('td');
+        tdNome.textContent = a.nome; tdNome.style.fontWeight = '600';
+
+        const tdTel = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = linkWhatsApp(a.telefone, 'Olá ' + a.nome + '! Sobre a lista do WPFG 2027…');
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = formatarTelefone(a.telefone);
+        tdTel.appendChild(link);
+
+        const tdP1 = document.createElement('td'); tdP1.textContent = a.prova1;
+        const tdP2 = document.createElement('td'); tdP2.textContent = a.prova2;
+        const tdP3 = document.createElement('td'); tdP3.textContent = a.prova3;
+
+        const tdObs = document.createElement('td');
+        tdObs.className = 'provas-cel';
+        tdObs.textContent = a.observacoes || '';
+
+        const tdAcao = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.className = 'btn-sec';
+        btn.textContent = '✕';
+        btn.title = 'Remover ' + a.nome;
+        btn.addEventListener('click', async function () {
+          if (!confirm('Remover a inscrição de ' + a.nome + '?')) return;
+          try {
+            await removerAtleta(chaveAdmin, a.id);
+            atletas = atletas.filter(function (x) { return x.id !== a.id; });
+            render();
+            aviso('Inscrição de ' + a.nome + ' removida.');
+          } catch (e) { erro(e.message); }
+        });
+        tdAcao.appendChild(btn);
+
+        [tdN, tdNome, tdTel, tdP1, tdP2, tdP3, tdObs, tdAcao].forEach(function (td) { tr.appendChild(td); });
+        tb.appendChild(tr);
+      });
+    });
+
+    tabela.appendChild(tb);
+    div.appendChild(tabela);
+    wrap.appendChild(div);
+    return wrap;
+  }
+
+  /* ---------- exportação ---------- */
+  const COLUNAS = ['Nome de guerra', 'Telefone', 'Gênero', 'Categoria', 'Prova 1', 'Prova 2', 'Prova 3', 'Observações', 'Data da inscrição'];
+
+  function linhas() {
+    const ordem = { Masculino: 0, Feminino: 1 };
+    return filtrados().slice().sort(function (a, b) {
+      if (ordem[a.genero] !== ordem[b.genero]) return ordem[a.genero] - ordem[b.genero];
+      const ca = CATEGORIAS.indexOf(a.categoria), cb = CATEGORIAS.indexOf(b.categoria);
+      if (ca !== cb) return ca - cb;
+      return a.nome.localeCompare(b.nome, 'pt-BR');
+    }).map(function (a) {
+      return [
+        a.nome,
+        formatarTelefone(a.telefone),
+        a.genero,
+        a.categoria,
+        a.prova1, a.prova2, a.prova3,
+        a.observacoes || '',
+        (a.criado_em || '').slice(0, 10)
+      ];
+    });
+  }
+
+  $('btnTSV').addEventListener('click', async function () {
+    const texto = [COLUNAS].concat(linhas()).map(function (l) { return l.join('\t'); }).join('\n');
+    try {
+      await navigator.clipboard.writeText(texto);
+      aviso('Copiado! Abra o Google Sheets, clique numa célula e cole (Ctrl+V).');
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      aviso('Copiado! Cole no Google Sheets com Ctrl+V.');
+    }
+  });
+
+  $('btnCSV').addEventListener('click', function () {
+    const esc = function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; };
+    const csv = [COLUNAS].concat(linhas()).map(function (l) { return l.map(esc).join(';'); }).join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'wpfg-2027-atletas.csv';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  $('btnMsg').addEventListener('click', async function () {
+    const url = location.href.replace(/admin\.html.*$/, 'index.html');
+    const msg = '🏃 *LISTA DE INTENÇÃO — WPFG 2027 / ATLETISMO*\n\n' +
+      'Pessoal, quem pretende competir no atletismo, preencha o formulário abaixo:\n\n' +
+      '👉 ' + url + '\n\n' +
+      'É rápido (1 minuto). Você informa:\n' +
+      '• Nome de guerra\n• Telefone/WhatsApp\n• Gênero\n• Data de nascimento (a categoria sai automática)\n' +
+      '• *3 provas* que pretende disputar\n\n' +
+      'Prazo: *' + (CONFIG.PRAZO || 'a definir') + '*\n' +
+      'Dúvidas, me chamem no privado. 💪';
+    try {
+      await navigator.clipboard.writeText(msg);
+      aviso('Mensagem copiada — é só colar no grupo do WhatsApp.');
+    } catch (e) {
+      prompt('Copie a mensagem abaixo:', msg);
+    }
+  });
+
+  iniciar();
+})();
+</script>
+</body>
+</html>
