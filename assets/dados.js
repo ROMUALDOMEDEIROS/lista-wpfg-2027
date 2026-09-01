@@ -25,7 +25,7 @@ const GRUPOS_PROVAS = [
   },
   {
     nome: 'Fundo / Rua',
-    provas: ['5km', '5km Cross Country', '10km', '21km (Meia Maratona)']
+    provas: ['5km', '5km Cross Country', '10km', '10km Cross Country', '21km (Meia Maratona)']
   }
 ];
 

@@ -93,7 +93,7 @@ senha e você vê:
 - **Métricas** — total, quantos homens, quantas mulheres, categorias preenchidas.
 - **Duas tabelas** — Masculino e Feminino, cada uma agrupada por faixa etária,
   com nome de guerra, telefone clicável (abre o WhatsApp do atleta) e as 3 provas.
-- **Atletas por prova** — quantos escolheram cada uma das 12 provas.
+- **Atletas por prova** — quantos escolheram cada uma das 13 provas.
 - **Copiar para Google Sheets** — copia tudo em formato de tabela; no Sheets é só
   clicar numa célula e dar Ctrl+V.
 - **Baixar CSV** — arquivo para Excel.
@@ -111,18 +111,18 @@ organização divulgar outra data de corte):
 
 18–29 · 30–34 · 35–39 · 40–44 · 45–49 · 50–54 · 55–59 · 60–64 · 65–69 · 70–74 · 75+
 
-**Provas (12), 3 por atleta:**
+**Provas (13), no mínimo 3 por atleta (sem máximo):**
 
 | Velocidade | Meio-fundo | Fundo / Rua |
 |---|---|---|
 | 100m | 800m | 5km |
 | 100m com Barreira | 1500m | 5km Cross Country |
 | 200m | 3000m com Obstáculos | 10km |
-| 400m | | 21km (Meia Maratona) |
-| 400m com Barreira | | |
+| 400m | | 10km Cross Country |
+| 400m com Barreira | | 21km (Meia Maratona) |
 
-**Validações:** nome e telefone obrigatórios, telefone com DDD, exatamente 3
-provas (o formulário trava a 4ª seleção), e **um telefone só se inscreve uma vez**
+**Validações:** nome e telefone obrigatórios, telefone com DDD, no mínimo 3
+provas, e **um telefone só se inscreve uma vez**
 — a segunda tentativa recebe um aviso para falar com o organizador.
 
 **Segurança:** com a chave pública dá para *inscrever*, mas não para *ler* a
