@@ -76,11 +76,28 @@ async function inscrever(atleta) {
     return atleta;
   }
 
-  const res = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/atletas', {
-    method: 'POST',
-    headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify(atleta)
-  });
+  const enviar = function (dados) {
+    return fetch(CONFIG.SUPABASE_URL + '/rest/v1/atletas', {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify(dados)
+    });
+  };
+
+  let res = await enviar(atleta);
+
+  /* Banco ainda sem a coluna "provas" (script de atualizacao nao rodado):
+     grava assim mesmo, com as tres primeiras provas, em vez de perder a
+     inscricao do atleta. */
+  if (!res.ok && atleta.provas) {
+    let checagem = {};
+    try { checagem = await res.clone().json(); } catch (e) { /* resposta sem json */ }
+    if (checagem.code === 'PGRST204' || (checagem.message || '').indexOf('provas') !== -1) {
+      const semArray = Object.assign({}, atleta);
+      delete semArray.provas;
+      res = await enviar(semArray);
+    }
+  }
 
   if (res.ok) return atleta;
 
@@ -92,6 +109,12 @@ async function inscrever(atleta) {
     throw err;
   }
   throw new Error(corpo.message || corpo.hint || ('Erro ' + res.status + ' ao salvar.'));
+}
+
+/* Provas de um atleta, venha do banco novo (array) ou do antigo (3 colunas). */
+function provasDoAtleta(a) {
+  if (a.provas && a.provas.length) return a.provas;
+  return [a.prova1, a.prova2, a.prova3].filter(Boolean);
 }
 
 /* Painel do organizador: a senha é conferida dentro do banco de dados. */

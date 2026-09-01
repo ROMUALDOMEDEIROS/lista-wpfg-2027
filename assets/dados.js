@@ -31,10 +31,20 @@ const GRUPOS_PROVAS = [
 
 const PROVAS = GRUPOS_PROVAS.flatMap(function (g) { return g.provas; });
 
-/* Idade completa na data de referencia da competicao (regra usual do WPFG:
-   idade no ultimo dia do evento). Ajuste DATA_REFERENCIA se a organizacao
-   divulgar outra data. */
-const DATA_REFERENCIA = '2027-08-31';
+/* WPFG 2027: os Jogos acontecem de 12/03/2027 a 21/03/2027.
+   A categoria do atleta e a idade que ele tera durante a competicao — usamos o
+   ULTIMO dia (21/03/2027), regra usual do WPFG: quem faz aniversario durante os
+   Jogos compete ja na idade nova. Se a organizacao divulgar outra data de corte,
+   basta mudar DATA_REFERENCIA aqui. */
+const EVENTO_INICIO = '2027-03-12';
+const EVENTO_FIM = '2027-03-21';
+const DATA_REFERENCIA = EVENTO_FIM;
+
+/* '2027-03-21' -> '21/03/2027' */
+function dataBR(iso) {
+  const p = (iso || '').split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+}
 
 function idadeNaReferencia(nascimentoISO) {
   if (!nascimentoISO) return null;

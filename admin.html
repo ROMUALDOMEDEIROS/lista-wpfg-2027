@@ -165,7 +165,7 @@
     const t = $('busca').value.trim().toLowerCase();
     if (!t) return atletas;
     return atletas.filter(function (a) {
-      return [a.nome, a.telefone, a.categoria, a.prova1, a.prova2, a.prova3, a.observacoes]
+      return [a.nome, a.telefone, a.categoria, provasDoAtleta(a).join(' '), a.observacoes]
         .join(' ').toLowerCase().indexOf(t) !== -1;
     });
   }
@@ -202,7 +202,7 @@
     const cont = {};
     PROVAS.forEach(function (p) { cont[p] = { M: 0, F: 0 }; });
     lista.forEach(function (a) {
-      [a.prova1, a.prova2, a.prova3].forEach(function (p) {
+      provasDoAtleta(a).forEach(function (p) {
         if (!cont[p]) cont[p] = { M: 0, F: 0 };
         cont[p][a.genero === 'Feminino' ? 'F' : 'M']++;
       });
@@ -246,7 +246,7 @@
     div.className = 'tabela-wrap';
     const tabela = document.createElement('table');
     tabela.innerHTML = '<thead><tr><th>#</th><th>Nome de guerra</th><th>Telefone</th>' +
-      '<th>Prova 1</th><th>Prova 2</th><th>Prova 3</th><th>Obs.</th><th></th></tr></thead>';
+      '<th>Qtd.</th><th>Provas escolhidas</th><th>Obs.</th><th></th></tr></thead>';
     const tb = document.createElement('tbody');
 
     CATEGORIAS.forEach(function (cat) {
@@ -256,7 +256,7 @@
       const trCat = document.createElement('tr');
       trCat.className = 'faixa-linha';
       const tdCat = document.createElement('td');
-      tdCat.colSpan = 8;
+      tdCat.colSpan = 7;
       tdCat.textContent = cat + ' — ' + doGrupo.length + (doGrupo.length === 1 ? ' atleta' : ' atletas');
       trCat.appendChild(tdCat);
       tb.appendChild(trCat);
@@ -276,9 +276,14 @@
         link.textContent = formatarTelefone(a.telefone);
         tdTel.appendChild(link);
 
-        const tdP1 = document.createElement('td'); tdP1.textContent = a.prova1;
-        const tdP2 = document.createElement('td'); tdP2.textContent = a.prova2;
-        const tdP3 = document.createElement('td'); tdP3.textContent = a.prova3;
+        const provas = provasDoAtleta(a);
+        const tdQtd = document.createElement('td');
+        tdQtd.textContent = provas.length;
+        if (provas.length > 3) tdQtd.style.fontWeight = '700';
+
+        const tdProvas = document.createElement('td');
+        tdProvas.className = 'provas-cel';
+        tdProvas.textContent = provas.join(' · ');
 
         const tdObs = document.createElement('td');
         tdObs.className = 'provas-cel';
@@ -300,7 +305,7 @@
         });
         tdAcao.appendChild(btn);
 
-        [tdN, tdNome, tdTel, tdP1, tdP2, tdP3, tdObs, tdAcao].forEach(function (td) { tr.appendChild(td); });
+        [tdN, tdNome, tdTel, tdQtd, tdProvas, tdObs, tdAcao].forEach(function (td) { tr.appendChild(td); });
         tb.appendChild(tr);
       });
     });
@@ -312,9 +317,21 @@
   }
 
   /* ---------- exportação ---------- */
-  const COLUNAS = ['Nome de guerra', 'Telefone', 'Gênero', 'Categoria', 'Prova 1', 'Prova 2', 'Prova 3', 'Observações', 'Data da inscrição'];
+  /* Quantas colunas de prova a planilha precisa: o atleta que escolheu mais. */
+  function maxProvas() {
+    return filtrados().reduce(function (m, a) {
+      return Math.max(m, provasDoAtleta(a).length);
+    }, 3);
+  }
+
+  function colunas() {
+    const fixas = ['Nome de guerra', 'Telefone', 'Gênero', 'Categoria', 'Qtd. provas'];
+    for (let i = 1; i <= maxProvas(); i++) fixas.push('Prova ' + i);
+    return fixas.concat(['Observações', 'Data da inscrição']);
+  }
 
   function linhas() {
+    const total = maxProvas();
     const ordem = { Masculino: 0, Feminino: 1 };
     return filtrados().slice().sort(function (a, b) {
       if (ordem[a.genero] !== ordem[b.genero]) return ordem[a.genero] - ordem[b.genero];
@@ -322,20 +339,23 @@
       if (ca !== cb) return ca - cb;
       return a.nome.localeCompare(b.nome, 'pt-BR');
     }).map(function (a) {
-      return [
+      const provas = provasDoAtleta(a);
+      const celulas = [
         a.nome,
         formatarTelefone(a.telefone),
         a.genero,
         a.categoria,
-        a.prova1, a.prova2, a.prova3,
-        a.observacoes || '',
-        (a.criado_em || '').slice(0, 10)
+        provas.length
       ];
+      for (let i = 0; i < total; i++) celulas.push(provas[i] || '');
+      celulas.push(a.observacoes || '');
+      celulas.push((a.criado_em || '').slice(0, 10));
+      return celulas;
     });
   }
 
   $('btnTSV').addEventListener('click', async function () {
-    const texto = [COLUNAS].concat(linhas()).map(function (l) { return l.join('\t'); }).join('\n');
+    const texto = [colunas()].concat(linhas()).map(function (l) { return l.join('\t'); }).join('\n');
     try {
       await navigator.clipboard.writeText(texto);
       aviso('Copiado! Abra o Google Sheets, clique numa célula e cole (Ctrl+V).');
@@ -352,7 +372,7 @@
 
   $('btnCSV').addEventListener('click', function () {
     const esc = function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; };
-    const csv = [COLUNAS].concat(linhas()).map(function (l) { return l.map(esc).join(';'); }).join('\r\n');
+    const csv = [colunas()].concat(linhas()).map(function (l) { return l.map(esc).join(';'); }).join('\r\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

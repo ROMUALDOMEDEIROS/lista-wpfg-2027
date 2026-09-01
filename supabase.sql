@@ -13,6 +13,7 @@ create table if not exists public.atletas (
   prova1       text not null,
   prova2       text not null,
   prova3       text not null,
+  provas       text[],                        -- todas as provas escolhidas (min. 3)
   observacoes  text,
   criado_em    timestamptz not null default now()
 );
@@ -33,7 +34,7 @@ create policy "inscricao publica"
   with check (
     char_length(nome) between 2 and 40
     and telefone ~ '^[0-9]{10,11}$'
-    and prova1 <> prova2 and prova2 <> prova3 and prova1 <> prova3
+    and (provas is null or array_length(provas, 1) >= 3)
   );
 
 -- =====================================================================
