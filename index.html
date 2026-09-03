@@ -22,7 +22,21 @@
     <code>README.md</code> para publicar de verdade.
   </div>
 
-  <div id="telaFormulario">
+  <p id="carregando" class="vazio">Carregando…</p>
+
+  <div id="telaFechado" class="card sucesso" hidden>
+    <div class="marca">🔒</div>
+    <h2>Inscrições encerradas</h2>
+    <p style="color:var(--suave);margin:0">
+      O prazo desta lista de intenção já foi fechado pela organização.
+      Se você precisa se inscrever ou corrigir algo, fale com o organizador.
+    </p>
+    <div style="margin-top:22px">
+      <a id="btnDuvidasFechado" class="btn-sec" style="text-decoration:none;display:none" target="_blank" rel="noopener">Falar com o organizador</a>
+    </div>
+  </div>
+
+  <div id="telaFormulario" hidden>
     <div class="card">
       <p style="margin-top:0;color:var(--suave);font-size:.93rem">
         Preencha seus dados e escolha <strong>no mínimo 3 provas</strong> —
@@ -117,9 +131,11 @@
   $('prazo').textContent = CONFIG.PRAZO || 'a definir';
   if (!supabaseConfigurado()) $('avisoLocal').hidden = false;
   if (CONFIG.WHATSAPP_ORGANIZADOR) {
-    const a = $('btnDuvidas');
-    a.href = linkWhatsApp(CONFIG.WHATSAPP_ORGANIZADOR, 'Olá! Falo sobre a lista do WPFG 2027.');
-    a.style.display = 'inline-block';
+    const link = linkWhatsApp(CONFIG.WHATSAPP_ORGANIZADOR, 'Olá! Falo sobre a lista do WPFG 2027.');
+    [$('btnDuvidas'), $('btnDuvidasFechado')].forEach(function (a) {
+      a.href = link;
+      a.style.display = 'inline-block';
+    });
   }
 
   /* ---------- categorias ---------- */
@@ -238,6 +254,12 @@
       await inscrever(atleta);
       mostrarSucesso(atleta);
     } catch (err) {
+      if (err.bloqueado) {
+        $('telaFormulario').hidden = true;
+        $('telaFechado').hidden = false;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       mostrarErro(err.duplicado
         ? 'Este telefone já está inscrito. Se precisar corrigir algo, fale com o organizador.'
         : ('Não consegui enviar: ' + err.message));
@@ -273,6 +295,14 @@
     $('telaSucesso').hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  /* ---------- inscrições abertas? ---------- */
+  (async function () {
+    const aberto = await inscricoesAbertas();
+    $('carregando').hidden = true;
+    if (aberto) $('telaFormulario').hidden = false;
+    else $('telaFechado').hidden = false;
+  })();
 
   $('btnOutro').addEventListener('click', function () {
     $('form').reset();

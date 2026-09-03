@@ -278,3 +278,30 @@ a { color: var(--azul); }
   font-size: .8rem;
 }
 .link-admin:hover { color: var(--azul); text-decoration: underline; }
+
+/* faixa de inscrições abertas / encerradas (painel) */
+.estado {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border-radius: var(--raio);
+  border: 1px solid var(--verde);
+  background: var(--verde-claro);
+  color: var(--verde);
+}
+.estado.fechado {
+  border-color: var(--vermelho);
+  background: var(--vermelho-claro);
+  color: var(--vermelho);
+}
+.estado-icone { font-size: 1.6rem; line-height: 1; }
+.estado-texto { flex: 1; display: flex; flex-direction: column; }
+.estado-texto strong { font-size: 1rem; }
+.estado-texto span { font-size: .84rem; opacity: .85; color: inherit; }
+.estado .btn-sec { flex: none; }
+@media (max-width: 520px) {
+  .estado { flex-wrap: wrap; }
+  .estado .btn-sec { width: 100%; }
+}

@@ -40,6 +40,15 @@
       (o Supabase ainda não foi configurado em <code>config.js</code>).
     </div>
 
+    <div id="estado" class="estado" hidden>
+      <span class="estado-icone" id="estadoIcone">🔓</span>
+      <div class="estado-texto">
+        <strong id="estadoTitulo">—</strong>
+        <span id="estadoDica"></span>
+      </div>
+      <button type="button" class="btn-sec" id="btnTrava">—</button>
+    </div>
+
     <div class="metricas" id="metricas"></div>
 
     <div class="barra">
@@ -138,6 +147,7 @@
     try {
       atletas = await listarAtletas(senhaAdmin);
       render();
+      renderEstado(await inscricoesAbertas());
       return true;
     } catch (e) {
       ultimoErro = e.senhaInvalida ? 'Senha incorreta.' : e.message;
@@ -396,6 +406,41 @@
       aviso('Mensagem copiada — é só colar no grupo do WhatsApp.');
     } catch (e) {
       prompt('Copie a mensagem abaixo:', msg);
+    }
+  });
+
+  /* ---------- inscrições abertas / encerradas ---------- */
+  let abertas = null;
+
+  function renderEstado(valor) {
+    abertas = valor;
+    $('estado').hidden = false;
+    $('estado').classList.toggle('fechado', !valor);
+    $('estadoIcone').textContent = valor ? '🔓' : '🔒';
+    $('estadoTitulo').textContent = valor ? 'Inscrições abertas' : 'Inscrições encerradas';
+    $('estadoDica').textContent = valor
+      ? 'Quem abrir o link consegue se inscrever.'
+      : 'Quem abrir o link vê o aviso de encerrado e não consegue enviar.';
+    $('btnTrava').textContent = valor ? '🔒 Encerrar inscrições' : '🔓 Reabrir inscrições';
+  }
+
+  $('btnTrava').addEventListener('click', async function () {
+    const alvo = !abertas;
+    const pergunta = alvo
+      ? 'Reabrir as inscrições? Qualquer pessoa com o link poderá se inscrever.'
+      : 'Encerrar as inscrições? Ninguém mais consegue enviar o formulário.';
+    if (!confirm(pergunta)) return;
+
+    const btn = $('btnTrava');
+    btn.disabled = true;
+    try {
+      await definirInscricoes(senhaAdmin, alvo);
+      renderEstado(alvo);
+      aviso(alvo ? 'Inscrições reabertas.' : 'Inscrições encerradas.');
+    } catch (e) {
+      erro('Não consegui mudar: ' + e.message);
+    } finally {
+      btn.disabled = false;
     }
   });
 

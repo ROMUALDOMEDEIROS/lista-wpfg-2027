@@ -108,7 +108,41 @@ async function inscrever(atleta) {
     err.duplicado = true;
     throw err;
   }
+  if (corpo.code === '42501') {
+    const err = new Error('As inscrições estão encerradas.');
+    err.bloqueado = true;
+    throw err;
+  }
   throw new Error(corpo.message || corpo.hint || ('Erro ' + res.status + ' ao salvar.'));
+}
+
+/* ---------- inscrições abertas / encerradas ---------- */
+
+const CHAVE_ABERTAS = 'wpfg2027_inscricoes_abertas';
+
+/* O formulário pergunta isto antes de aparecer. Se a consulta falhar,
+   assume ENCERRADO — melhor recusar do que aceitar algo que o banco vai
+   rejeitar na hora de gravar. */
+async function inscricoesAbertas() {
+  if (!supabaseConfigurado()) {
+    return localStorage.getItem(CHAVE_ABERTAS) !== 'false';
+  }
+  try {
+    return await chamarFuncao('inscricoes_abertas', {}) === true;
+  } catch (e) {
+    console.error('Não consegui checar se as inscrições estão abertas:', e.message);
+    return false;
+  }
+}
+
+/* Interruptor do painel — exige a senha do organizador. */
+async function definirInscricoes(senha, aberto) {
+  if (!supabaseConfigurado()) {
+    if (senha !== CONFIG.SENHA_TESTE_LOCAL) throw erroSenha();
+    localStorage.setItem(CHAVE_ABERTAS, aberto ? 'true' : 'false');
+    return aberto;
+  }
+  return chamarFuncao('definir_inscricoes', { senha: senha, aberto: aberto });
 }
 
 /* Provas de um atleta, venha do banco novo (array) ou do antigo (3 colunas). */
